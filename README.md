@@ -12,7 +12,7 @@
 
 ## Quickstart
 
-1. **Try it now, no keys:** `npm install && npm run dev`, open http://localhost:3000. Mock mode makes three sample files: 🔓 unlock one, tap 💳 Pay, press ✅ pay on the mock page, and the purchase tab unlocks by itself. Seller view: http://localhost:3000/seller/demo.
+1. **Try it now, no keys:** `npm install && npm run dev`, open http://localhost:3000. Mock mode makes three sample files: 🔓 unlock one, tap 💳 Pay, press ✅ pay on the mock page, and the purchase tab unlocks by itself. Also try ⚠️ short → 👍 accept / ↩️ decline, 🚩 wrong coin or ⌛ expire. Seller view: http://localhost:3000/seller/demo.
 2. **send21 key.** On [send21.io/api-keys](https://send21.io/api-keys), create a key with `drafts:write` (add `webhooks:manage` for step 4).
 3. **Configure.** `cp .env.example .env`: the key, `PUBLIC_URL`, your own receiving addresses (`PAY_LIGHTNING=you@your-wallet.com`, `PAY_OPTIONS=usdc-sol:<address>`), and two secrets: `DOWNLOAD_SECRET` and `SELLER_TOKEN` (`openssl rand -hex 32`).
 4. **Webhook.** Put the server behind your own HTTPS address (for example a reverse proxy with a free Let's Encrypt certificate and `TRUST_PROXY=1`), then `npm run webhook:register` and paste the printed `SEND21_WEBHOOK_SECRET` into `.env`.

@@ -7,11 +7,11 @@ import type { Catalog, FileItem, PayOption, Purchase } from "./types.js";
 
 export const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-export function layout(title: string, body: string, opts: { script?: string; mock?: boolean } = {}): string {
+export function layout(title: string, body: string, opts: { script?: string; mock?: boolean; wide?: boolean } = {}): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)}</title><meta name="robots" content="noindex"><link rel="stylesheet" href="/paywall.css">${opts.script ? `<script src="${esc(opts.script)}" defer></script>` : ""}</head>
-<body><main class="wrap">${body}</main>
+<title>${esc(title)}</title><meta name="robots" content="noindex"><meta name="theme-color" content="#0f1013"><link rel="icon" href="data:,"><link rel="stylesheet" href="/paywall.css">${opts.script ? `<script src="${esc(opts.script)}" defer></script>` : ""}</head>
+<body><main class="wrap${opts.wide ? " wide" : ""}">${body}</main>
 <footer class="foot">${opts.mock ? "🧪 mock mode · no real money · " : ""}🔒 non-custodial · paid with <a href="https://send21.io">send21</a></footer></body></html>`;
 }
 
@@ -28,9 +28,9 @@ const meta = (f: FileItem) => `<p class="meta">${esc(kindLabel(f.kind))} · ${es
 export function indexPage(c: Catalog, mock: boolean): string {
   return layout(
     c.creator,
-    `<header class="hero"><p class="kicker">🛍️ files by</p><h1>${esc(c.creator)}</h1></header>
-<ul class="grid">${c.files.map((f) => `<li><a class="mini" href="/f/${esc(f.slug)}">${fileTile(f, true)}<b>${esc(f.title)}</b><span>${esc(formatFiat(f.price, c.currency))}</span></a></li>`).join("")}</ul>`,
-    { mock },
+    `<header class="hero"><p class="kicker">🛍️ files by</p><h1>${esc(c.creator)}</h1><p class="sub">🔓 pay once with crypto · ⬇️ download right away · no account</p></header>
+${c.files.length ? `<ul class="grid">${c.files.map((f) => `<li><a class="mini" href="/f/${esc(f.slug)}">${fileTile(f, true)}<b>${esc(f.title)}</b><span class="p">${esc(formatFiat(f.price, c.currency))}</span></a></li>`).join("")}</ul>` : '<article class="card center"><p class="huge">📭</p><p>no files yet</p><p class="small">add one with <code>npm run file:add</code></p></article>'}`,
+    { mock, wide: true },
   );
 }
 
@@ -99,7 +99,7 @@ const TOKEN_ERR = {
 
 export function tokenErrorPage(kind: keyof typeof TOKEN_ERR, mock: boolean): string {
   const [icon, title, why] = TOKEN_ERR[kind];
-  return layout(title, `<article class="card center"><p class="huge">${icon}</p><h1>${esc(title)}</h1><p class="small">${esc(why)}</p><p class="small">🔖 Open your purchase page again for a fresh link.</p></article>`, { mock });
+  return layout(title, `<article class="card center"><p class="huge">${icon}</p><h1>${esc(title)}</h1><p class="small">${esc(why)}</p><p class="small">🔖 Open your purchase page again for a fresh link.</p><a class="cta ghost" href="/">🛍️ browse files</a></article>`, { mock });
 }
 
 export function errorPage(msg: string, mock: boolean): string {
@@ -136,15 +136,17 @@ ${review.length ? `<h2>🚩 Review</h2><ul class="list">${review.map((p) => `<li
 
 // ---------- mock send21 pay page ----------
 
-export function mockPayPage(entry: { fiatAmount: number; fiatCurrency: string; memo: string; options: PayOption[] }, token: string): string {
+export function mockPayPage(entry: { fiatAmount: number; fiatCurrency: string; memo: string; options: PayOption[] }, token: string, sent?: { ok: boolean; events: string }): string {
   const t = esc(token);
   const coins = entry.options.map((o, i) => `<option value="${i}">${esc(`${o.currency.toUpperCase()} · ${o.method ?? o.network}`)}</option>`).join("");
-  const actions = [["seen", "👀 start paying"], ["paid", "✅ pay"], ["short", "⚠️ pay 5% short"], ["wrong", "🚩 pay a wrong coin"], ["expire", "⌛ let it expire"]];
+  const actions = [["paid", "✅ pay"], ["seen", "👀 start paying"], ["short", "⚠️ pay 5% short"], ["accept", "👍 accept the short pay"], ["decline", "↩️ decline the short pay"], ["wrong", "🚩 pay a wrong coin"], ["expire", "⌛ let it expire"]];
   return layout(
     "mock pay · send21",
     `<article class="card center"><p class="pill">🧪 mock send21 · no real money</p><p class="price">${esc(formatFiat(entry.fiatAmount, entry.fiatCurrency))}</p><p class="small">${esc(entry.memo)}</p>
-${actions.map(([a, l]) => `<form class="mockrow" method="post" action="/mock/pay/${t}/${a}"><select name="coin" aria-label="coin">${coins}</select><button>${l}</button></form>`).join("")}
-<p class="small">↩️ then go back to the purchase tab</p></article>`,
+${sent ? `<p class="pill ${sent.ok ? "ok" : "bad"}" role="status">${sent.ok ? "📨 sent" : "❌ refused"} <code>${esc(sent.events)}</code></p>` : ""}
+<form method="post" action="/mock/pay/${t}/paid" class="mockform"><label for="coin">🪙 pay with</label><select id="coin" name="coin">${coins}</select>
+<div class="acts">${actions.map(([a, l]) => `<button formaction="/mock/pay/${t}/${a}"${a === "paid" ? ' class="main"' : ""}>${l}</button>`).join("")}</div></form>
+<p class="small">Each button sends a signed webhook, like send21 would. 👍 / ↩️ are what the send21 account owner does with a short pay. ↩️ Then go back to the purchase tab: it updates by itself.</p></article>`,
     { mock: true },
   );
 }

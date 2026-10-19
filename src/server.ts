@@ -286,22 +286,30 @@ function mountMockPay(app: Express, secret: string, mock: NonNullable<AppDeps["m
       res.status(404).type("html").send(errorPage("🤷 unknown pay link", true));
       return;
     }
-    const body = mockEvent(entry, Number((req.body as { coin?: string })?.coin ?? 0), String(req.params.action));
-    const raw = JSON.stringify(body);
-    const deliveryId = randomUUID();
-    const r = await fetch(`${mock.selfUrl}/webhooks/send21`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-send21-event": body.event, "x-send21-delivery": deliveryId, "x-send21-signature-v2": signV2(raw, deliveryId, Math.floor(Date.now() / 1000), secret) },
-      body: raw,
-    });
-    res.type("html").send(mockPayPage(entry.body, String(req.params.token)).replace("<p class=\"small\">↩️", `<p class="pill">${r.ok ? "📨 sent" : "❌"} ${body.event}</p><p class="small">↩️`));
+    const list = mockEvents(entry, Number((req.body as { coin?: string })?.coin ?? 0), String(req.params.action));
+    if (!list) {
+      res.status(404).type("html").send(errorPage("🤷 unknown mock action", true));
+      return;
+    }
+    let r = { ok: false, status: 0 };
+    for (const body of list) {
+      const raw = JSON.stringify(body);
+      const deliveryId = randomUUID();
+      r = await fetch(`${mock.selfUrl}/webhooks/send21`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-send21-event": body.event, "x-send21-delivery": deliveryId, "x-send21-signature-v2": signV2(raw, deliveryId, Math.floor(Date.now() / 1000), secret) },
+        body: raw,
+      });
+      if (!r.ok) break;
+    }
+    res.status(r.ok ? 200 : 502).type("html").send(mockPayPage(entry.body, String(req.params.token), { ok: r.ok, events: list.map((b) => b.event).join(" → ") }));
   });
 }
 
 type MockEntry = NonNullable<ReturnType<ReturnType<typeof createMockClient>["requests"]["get"]>>;
 
-/** A webhook body shaped like send21's (docs/webhooks "Payload"), for one simulated action. */
-export function mockEvent(entry: MockEntry, coin: number, action: string) {
+/** Webhook bodies shaped like send21's (docs/webhooks "Payload") for one simulated action, or null for an unknown one. */
+export function mockEvents(entry: MockEntry, coin: number, action: string): { event: string; data: Record<string, unknown> }[] | null {
   const option = entry.body.options[coin] ?? entry.body.options[0]!;
   const units = option.currency === "Btc" ? 1e8 : option.currency === "Sol" || option.currency === "Eth" ? 1e9 : 1e6;
   const price = option.currency === "Btc" ? 60000 : option.currency === "Eth" ? 3000 : option.currency === "Sol" ? 150 : 1;
@@ -318,17 +326,28 @@ export function mockEvent(entry: MockEntry, coin: number, action: string) {
     sentAmount: (amountSats / units).toFixed(Math.log10(units)),
     occurredAt: new Date().toISOString(),
   };
+  const short = Math.round(amountSats * 0.95);
   const confirmed = { event: "draft.confirmed", data: { ...base, status: "Confirmed", txId: `mock-${randomUUID()}`, confirmations: 1 } };
   switch (action) {
     case "paid":
-      return confirmed;
+      return [confirmed];
     case "wrong": // a confirmed payment in a coin this purchase never offered: must be 🚩, never unlocked
-      return { ...confirmed, data: { ...confirmed.data, sentCurrency: "ETH", network: "Arbitrum" } };
+      return [{ ...confirmed, data: { ...confirmed.data, sentCurrency: "ETH", network: "Arbitrum" } }];
     case "seen":
-      return { event: "draft.seen", data: { ...base, status: "Seen", txId: `mock-${randomUUID()}`, confirmations: 0 } };
+      return [{ event: "draft.seen", data: { ...base, status: "Seen", txId: `mock-${randomUUID()}`, confirmations: 0 } }];
     case "short":
-      return { event: "draft.amount_mismatch", data: { ...base, status: "AwaitingPayment", reviewState: "pending", receivedAmountSats: Math.round(amountSats * 0.95) } };
+      return [{ event: "draft.amount_mismatch", data: { ...base, status: "AwaitingPayment", reviewState: "pending", receivedAmountSats: short } }];
+    // What the send21 account owner does with a short pay: accept (then draft.confirmed) or decline.
+    case "accept":
+      return [
+        { event: "draft.mismatch_accepted", data: { ...base, status: "AwaitingPayment", reviewState: "accepted", acceptReason: "close enough", receivedAmountSats: short } },
+        { ...confirmed, data: { ...confirmed.data, receivedAmountSats: short } },
+      ];
+    case "decline":
+      return [{ event: "draft.mismatch_rejected", data: { ...base, status: "AwaitingPayment", reviewState: "rejected", rejectReason: "too short", refund: "manual", receivedAmountSats: short } }];
+    case "expire":
+      return [{ event: "payment_request.expired", data: { paymentRequestId: entry.response.id, orderId: entry.body.orderId, opened: true, quoteRequested: false } }];
     default:
-      return { event: "payment_request.expired", data: { paymentRequestId: entry.response.id, orderId: entry.body.orderId, opened: true, quoteRequested: false } };
+      return null;
   }
 }
