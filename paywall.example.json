@@ -1,0 +1,9 @@
+{
+  "creator": "Night Owl Studio",
+  "currency": "EUR",
+  "files": [
+    { "slug": "night-drive", "title": "Night drive beat", "emoji": "🎧", "price": 7, "file": "night-drive-beat.wav", "preview": "Lo-fi beat, 92 BPM. Free for your videos and streams.", "tags": ["WAV", "92 BPM", "royalty free"] },
+    { "slug": "film-presets", "title": "Film look presets", "emoji": "🎞️", "price": 12, "file": "film-presets.zip", "preview": "12 warm film-style presets for photo apps.", "kind": "presets", "tags": ["12 presets", "XMP"] },
+    { "slug": "zine-1", "title": "Zine issue #1", "emoji": "📖", "price": 4, "file": "zine-issue-1.pdf", "preview": "Sketches, notes and a city walk, in one PDF.", "tags": ["PDF", "A4"] }
+  ]
+}
