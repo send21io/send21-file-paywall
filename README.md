@@ -15,6 +15,7 @@
 1. **Try it now, no keys:** `npm install && npm run dev`, open http://localhost:3000. Mock mode makes three sample files: 🔓 unlock one, tap 💳 Pay, press ✅ pay on the mock page, and the purchase tab unlocks by itself. Also try ⚠️ short → 👍 accept / ↩️ decline, 🚩 wrong coin or ⌛ expire. Seller view: http://localhost:3000/seller/demo.
 2. **send21 key.** On [send21.io/api-keys](https://send21.io/api-keys), create a key with `drafts:write` (add `webhooks:manage` for step 4).
 3. **Configure.** `cp .env.example .env`: the key, `PUBLIC_URL`, your own receiving addresses (`PAY_LIGHTNING=you@your-wallet.com`, `PAY_OPTIONS=usdc-sol:<address>`), and two secrets: `DOWNLOAD_SECRET` and `SELLER_TOKEN` (`openssl rand -hex 32`).
+   - 🔐 **Approve your receiving addresses in send21.** New send21 accounts (created on or after 20 Oct 2026) only accept receiving addresses the owner approved, including Lightning addresses. Add them in the send21 app, or propose one from an agent (MCP `propose_receiving_address`), then sign in and approve it with a passkey or authenticator code. No API key can approve an address. Older accounts can opt in under Settings.
 4. **Webhook.** Put the server behind your own HTTPS address (for example a reverse proxy with a free Let's Encrypt certificate and `TRUST_PROXY=1`), then `npm run webhook:register` and paste the printed `SEND21_WEBHOOK_SECRET` into `.env`.
 5. **Add your files and go.** `npm run file:add -- ./night-drive.wav --title "Night drive beat" --price 7 --tags "WAV,92 BPM"`, then `npm run build && npm start`. Share `https://your-site/f/<slug>`.
 
@@ -55,6 +56,10 @@ sequenceDiagram
 **⚡ Lightning.** send21 fetches an invoice from your Lightning address and confirms the payment when your wallet provider supports **LUD-21**. Without it the money still reaches you, but the download does not unlock on its own. See [Lightning](https://send21.io/docs/lightning).
 
 **Fees.** One small send21 fee per paid purchase (0.49% on small payments, at least $0.01), never taken from the payment. See [pricing](https://send21.io/pricing).
+
+## Troubleshooting
+
+- **422 `address_not_approved`:** a receiving address isn't approved in your send21 account, so nothing was created. Sign in to send21, approve the address (passkey or authenticator code), then try again.
 
 ## Security notes
 
